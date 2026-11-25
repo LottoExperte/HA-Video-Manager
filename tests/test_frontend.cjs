@@ -25,7 +25,7 @@ assert.equal(Panel.extensionOf({filename:'Weihnachten-2001.TS'}), 'ts');
 assert.equal(Panel.extensionOf({filename:'Ferienfilm-2024.MOV'}), 'mov');
 assert.equal(Panel.groupForExtension('.mov'), 'mov');
 assert.match(source,/const basic=new Set\(\['avi','mpg','mp4','mkv','ts','mov'\]\)/);
-assert.match(source,/Version 1\.0\.3/);
+assert.match(source,/Version 1\.0\.4/);
 assert.equal(Panel.extensionOf({extension:'.TS',filename:'Weihnachten-2001.mkv'}), 'ts');
 assert.equal(Panel.groupForExtension('.ts'), 'ts');
 assert.equal(Panel.groupForExtension('mpeg'), 'mpg');

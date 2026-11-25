@@ -1,7 +1,7 @@
 {
   "domain": "hoffmann_video_ha",
   "name": "Hoffmann Video-Manager für Home Assistant",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "documentation": "https://github.com/LottoExperte/HA-Video-Manager",
   "dependencies": [
     "frontend",

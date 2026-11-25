@@ -47,6 +47,32 @@ def _numeric(value: str, default: int = 0) -> int:
         return default
 
 
+def _runtime_minutes(value: str) -> float:
+    """Read Kodi NFO minutes, also accepting '90 min' or '01:30:00'.
+
+    Durations must come from NFO, never be inferred from file size.
+    """
+    text = (value or "").strip().lower().replace(",", ".")
+    if not text:
+        return 0
+    # Kodi normally uses an integer count of minutes.
+    match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:min(?:ute)?s?|minuten?)?", text)
+    if match:
+        minutes = float(match.group(1))
+        return minutes if 0 < minutes <= 100000 else 0
+    match = re.fullmatch(r"(\d{1,3}):(\d{2}):(\d{2})", text)
+    if match:
+        hours, minutes, seconds = map(int, match.groups())
+        if minutes < 60 and seconds < 60:
+            return hours * 60 + minutes + seconds / 60
+    match = re.fullmatch(r"(\d+)\s*h(?:ours?|stunden?)?\s*(\d{1,2})?\s*(?:m|min(?:uten?)?)?", text)
+    if match:
+        hours, minutes = int(match.group(1)), int(match.group(2) or 0)
+        if minutes < 60:
+            return hours * 60 + minutes
+    return 0
+
+
 def _rating_number(value: str) -> float | None:
     """Accept 7.4 and German 7,4; never treat text as a numeric rating."""
     text = (value or "").strip().replace(",", ".")
@@ -145,8 +171,8 @@ def read_nfo(path: Path) -> dict[str, Any]:
         candidate = _child_value(root, "imdbid") or _child_value(root, "id")
         if IMDB_PATTERN.fullmatch(candidate):
             imdb_id = candidate
-    runtime_minutes = _numeric(_child_value(root, "runtime"))
-    duration_seconds = _numeric(_child_value(extra, "duration_seconds")) or runtime_minutes * 60
+    runtime_minutes = _runtime_minutes(_child_value(root, "runtime"))
+    duration_seconds = max(0, _numeric(_child_value(extra, "duration_seconds"))) or round(runtime_minutes * 60)
     genre_list = _children_values(root, "genre")
     # Respect Kodi and Hoffmann multi-element genre representation
     genre_list = [g.strip() for item in genre_list for g in re.split(r"[,;|]+", item) if g.strip()]

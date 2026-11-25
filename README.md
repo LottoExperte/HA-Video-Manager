@@ -1,6 +1,6 @@
 # Hoffmann Video-Manager für Home Assistant
 
-Eine schlanke, bildfreie Videothek für Home Assistant. Version **1.0.3** (Testversion).
+Eine schlanke, bildfreie Videothek für Home Assistant. Version **1.0.4** (Testversion).
 
 Diese Integration liest vorhandene Filmdateien und die zugehörigen XML-NFO-Dateien aus einer bereits in Home Assistant eingebundenen Medienfreigabe. Die Pflege und Aktualisierung der Filmdaten erfolgt weiterhin im **Hoffmann Video-Manager**.
 
@@ -8,6 +8,8 @@ Diese Integration liest vorhandene Filmdateien und die zugehörigen XML-NFO-Date
 - Schnelle Tabelle mit Suche, Filtern und Sortierung; **ausschließlich Videodateien als Listeneinträge**
 - **Dateiformat-Auswahl mit Häkchen:** AVI, MPG/MPEG, MP4, MKV, TS, **MOV** und weitere vorhandene Formate; alle Formate beim ersten Start aktiviert, Auswahl bleibt im jeweiligen Browser gespeichert
 - **Bewertungsfilter:** alle, nur bewertete, unbewertete oder Filme ab 5,0 bis 9,5 Punkten; zusätzlich Bewertungsquelle „Nur IMDb“ oder „Ohne KI-Schätzungen“. Bewertung absteigend sortieren bleibt möglich
+- **Laufzeitfilter:** Bis 45, 60, 75, **90** oder 120 Minuten, über 90 Minuten und „Laufzeit unbekannt“; nur bekannte Laufzeiten kommen in die „bis“-Filter, 90:00 ist eingeschlossen. Sortierung nach kurzer Laufzeit verfügbar.
+- **Zufallsfilm:** Wählt aus **allen aktuellen Such- und Filterergebnissen**, nicht nur aus der sichtbaren Tabellenseite. Zunächst erscheinen die Filmdetails; die Wiedergabe startet erst über den separaten Knopf **„Abspielen“**.
 - **Filmtitel statt Dateiname:** Titel aus der passenden NFO wird in Tabelle, Suche und Wiedergabe angezeigt; Dateiname nur als Ersatz, wenn kein NFO-Titel vorliegt. Im Detailfenster steht die Titelquelle.
 - **Katalogbereinigung:** Versteckte Dateien wie `._Alles steht Kopf.mpg` und Videodateien **unter 1 MB** werden ignoriert. Die Mindestgröße ist optional in `configuration.yaml` einstellbar.
 - **Neu einlesen entfernt alte Katalogeinträge:** Umbenannte, gelöschte, ausgeblendete oder zu kleine Videos erscheinen nach dem Scan nicht mehr. **Auf dem Datenträger werden keinerlei Dateien gelöscht.** Die Anzahl entfernter Katalogeinträge wird gemeldet.
@@ -101,6 +103,14 @@ Beim Abspielen fordert das Panel über die angemeldete Home-Assistant-Sitzung ei
 Die Integration bringt **keine separaten Benutzer- oder Filmfreigaben** mit. Sie prüft die Anmeldung über die Home-Assistant-WebSocket-Schnittstelle, ist aber **keine eigene Zugriffsschranke pro Film**. Benutzer mit Zugang zur Oberfläche können den zentralen Katalog sehen; individuelle Freigaben sollten nicht vorausgesetzt werden.
 
 Nicht alle Browser spielen MKV/AVI-Dateien oder darin enthaltene Codecs ab. Ein Dateiformatfehler ist kein Berechtigungsfehler.
+
+## Laufzeitfilter und Zufallsfilm (V1.0.4)
+
+In der oberen Filterleiste **„Bis 90 Minuten“** wählen. Berücksichtigt werden nur Videos mit einer **bekannten Laufzeit** aus der zugehörigen NFO-Datei (`<runtime>` in Minuten oder `<hoffmann_video_manager><duration_seconds>` in Sekunden). **90:00 Minuten gehören dazu; 90:01 nicht mehr.** Ohne Laufzeitangabe werden Filme bei einer Minutenobergrenze ausgeblendet, damit kein unbekannt langer Film vorgeschlagen wird. Mit **„Laufzeit unbekannt“** lassen sich solche Filme gezielt finden. Der Video-Manager liest weiterhin keine Videodateien vollständig aus und führt keine FFmpeg-Analyse aus. Für korrekte Angaben die NFO-Dateien im PC-Video-Manager aktualisieren und danach **„Filme neu einlesen“**.
+
+**„🎲 Zufallsfilm“** berücksichtigt sämtliche aktiven Filter (Laufzeit, Suchtext, Genre, Bewertungen, Formate, Favoriten usw.) und alle Ergebnisse über alle Tabellenseiten hinweg. Es erscheint zunächst das Infofenster mit **„▶ Abspielen“**; so wird in der Schule kein Film versehentlich sofort gestartet. Ein direkter zweiter Zufallstreffer wird nach Möglichkeit nicht wiederholt. Es werden keine Dateien verändert.
+
+Bei der Vorführung von Spielfilmen im Unterricht bitte die benötigten Vorführ- bzw. Nutzungsrechte beachten.
 
 ## Updates
 
