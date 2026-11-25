@@ -2,7 +2,7 @@
   "domain": "hoffmann_video_ha",
   "name": "Hoffmann Video-Manager für Home Assistant",
   "version": "1.0.0",
-  "documentation": "https://github.com/LottoExperte/ha-hoffmann-video-manager",
+  "documentation": "https://github.com/LottoExperte/HA-Video-Manager",
   "dependencies": [
     "frontend",
     "http",
@@ -15,5 +15,5 @@
   ],
   "requirements": [],
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/LottoExperte/ha-hoffmann-video-manager/issues"
+  "issue_tracker": "https://github.com/LottoExperte/HA-Video-Manager/issues"
 }
