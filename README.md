@@ -2,7 +2,7 @@
 
 Eine schlanke, bildfreie Videothek für Home Assistant. Version **1.0.0** (erste Testversion).
 
-Diese Integration liest vorhandene Filmdateien und die zugehörigen XML-NFO-Dateien aus einer bereits in Home Assistant eingebundenen Medienfreigabe. Der eigene Video-Manager kann weiter für die Metadatenpflege verwendet werden.
+Diese Integration liest vorhandene Filmdateien und die zugehörigen XML-NFO-Dateien aus einer bereits in Home Assistant eingebundenen Medienfreigabe. Die Pflege und Aktualisierung der Filmdaten erfolgt weiterhin im **Hoffmann Video-Manager**.
 
 - **Keine KI-Abfragen, keine Cover, kein eigener Benutzer-Login**
 - Schnelle Tabelle mit Suche, Filtern und Sortierung
@@ -10,6 +10,17 @@ Diese Integration liest vorhandene Filmdateien und die zugehörigen XML-NFO-Date
 - Filme direkt im Home-Assistant-Browser starten (über `media_source/resolve_media`)
 - **Videos und NFO-Dateien werden ausschließlich gelesen, niemals verändert**
 - Zentrale Katalog-Zwischenspeicherung in Home Assistant; manuell neu einlesen
+
+## Zusammenspiel mit dem Video-Manager von Hoffmann Software
+
+Der **HA-Video-Manager** ist bewusst eine schlanke **Anzeige- und Wiedergabeoberfläche** für Home Assistant. Für die **Verwaltung und Aktualisierung der Filmdaten** gibt es den eigenständigen [**Hoffmann Video-Manager**](https://video.hoffmann-software.de/).
+
+- Im **Hoffmann Video-Manager** können Filme verwaltet sowie Titel, Jahr, Beschreibung, Genre und IMDb-Verknüpfungen mithilfe der vorhandenen KI-/Wikidata-Suche gepflegt werden.
+- Die aktualisierten Metadaten werden über **NFO-Zusatzdateien im selben Ordner wie die Filmdateien** bereitgestellt. Wichtig: Die NFO-Dateien müssen für Home Assistant über die eingebundene Medienfreigabe erreichbar sein.
+- Der **HA-Video-Manager** liest diese Daten nur ein und bietet eine schnelle Suche, Filter und Wiedergabe im Browser. Er benötigt **keine eigene KI-Anbindung** und schreibt nichts in die Film- oder NFO-Dateien.
+- Nach Änderungen an NFO-Dateien im Home-Assistant-Video-Manager **„Filme neu einlesen“** wählen, damit die aktualisierten Angaben im Katalog erscheinen.
+
+Die Programme können getrennt verwendet werden. Auch Filme **ohne NFO-Datei** erscheinen im HA-Video-Manager anhand ihres Dateinamens.
 
 ## Voraussetzung
 
