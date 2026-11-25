@@ -20,5 +20,7 @@ jobs:
         run: python tests/test_scanner.py
       - name: JavaScript-Syntax
         run: node --check custom_components/hoffmann_video_ha/frontend/panel.js
+      - name: Frontend-Bewertung und Dateiformat-Auswahl
+        run: node tests/test_frontend.cjs
       - name: Manifest-JSON
         run: python -c "import json; from pathlib import Path; json.loads(Path('custom_components/hoffmann_video_ha/manifest.json').read_text())"

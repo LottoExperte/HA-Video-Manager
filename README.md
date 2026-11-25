@@ -1,12 +1,15 @@
 # Hoffmann Video-Manager für Home Assistant
 
-Eine schlanke, bildfreie Videothek für Home Assistant. Version **1.0.0** (erste Testversion).
+Eine schlanke, bildfreie Videothek für Home Assistant. Version **1.0.1** (Testversion).
 
 Diese Integration liest vorhandene Filmdateien und die zugehörigen XML-NFO-Dateien aus einer bereits in Home Assistant eingebundenen Medienfreigabe. Die Pflege und Aktualisierung der Filmdaten erfolgt weiterhin im **Hoffmann Video-Manager**.
 
 - **Keine KI-Abfragen, keine Cover, kein eigener Benutzer-Login**
-- Schnelle Tabelle mit Suche, Filtern und Sortierung
-- NFO: Titel, Jahr, Genre, Inhalt, Regie, Darsteller, Laufzeit, IMDb-ID, Favoriten und Gesehen-Status
+- Schnelle Tabelle mit Suche, Filtern und Sortierung; **ausschließlich Videodateien als Listeneinträge**
+- **Dateiformat-Auswahl mit Häkchen:** AVI, MPG/MPEG, MP4, MKV, TS, **MOV** und weitere vorhandene Formate; alle Formate beim ersten Start aktiviert, Auswahl bleibt im jeweiligen Browser gespeichert
+- Bewertungsanzeige bereits in der Filmliste; nach Bewertung sortieren
+- **Filmtitel statt Dateiname:** Titel aus der passenden NFO wird in Tabelle, Suche und Wiedergabe angezeigt; Dateiname nur als Ersatz, wenn kein NFO-Titel vorliegt. Im Detailfenster steht die Titelquelle.
+- NFO: Titel, Jahr, Genre, Inhalt, Regie, Darsteller, Laufzeit, IMDb-ID, IMDb-Bewertung, gekennzeichnete KI-Schätzung, Favoriten und Gesehen-Status
 - Filme direkt im Home-Assistant-Browser starten (über `media_source/resolve_media`)
 - **Videos und NFO-Dateien werden ausschließlich gelesen, niemals verändert**
 - Zentrale Katalog-Zwischenspeicherung in Home Assistant; manuell neu einlesen
@@ -18,7 +21,7 @@ Der **HA-Video-Manager** ist bewusst eine schlanke **Anzeige- und Wiedergabeober
 - Im **Hoffmann Video-Manager** können Filme verwaltet sowie Titel, Jahr, Beschreibung, Genre und IMDb-Verknüpfungen mithilfe der vorhandenen KI-/Wikidata-Suche gepflegt werden.
 - Die aktualisierten Metadaten werden über **NFO-Zusatzdateien im selben Ordner wie die Filmdateien** bereitgestellt. Wichtig: Die NFO-Dateien müssen für Home Assistant über die eingebundene Medienfreigabe erreichbar sein.
 - Der **HA-Video-Manager** liest diese Daten nur ein und bietet eine schnelle Suche, Filter und Wiedergabe im Browser. Er benötigt **keine eigene KI-Anbindung** und schreibt nichts in die Film- oder NFO-Dateien.
-- Nach Änderungen an NFO-Dateien im Home-Assistant-Video-Manager **„Filme neu einlesen“** wählen, damit die aktualisierten Angaben im Katalog erscheinen.
+- Nach Änderungen der NFO-Dateien mit dem Hoffmann Video-Manager im Home-Assistant-Video-Manager **„Filme neu einlesen“** wählen, damit die aktualisierten Angaben im Katalog erscheinen.
 
 Die Programme können getrennt verwendet werden. Auch Filme **ohne NFO-Datei** erscheinen im HA-Video-Manager anhand ihres Dateinamens.
 
@@ -28,7 +31,7 @@ Home Assistant **2026.11 oder neuer** mit Marketplace. Die Videos müssen bereit
 
 ## Installation über Marketplace
 
-1. Dieses Repository **öffentlich** auf GitHub bereitstellen. Das Paket enthält ein echtes Git-Repository sowie den Veröffentlichungsassistenten `REPOSITORY-VEROEFFENTLICHEN.ps1`. Siehe `GITHUB-ERSTE-SCHRITTE.md`.
+1. Das bereits veröffentlichte Repository [LottoExperte/HA-Video-Manager](https://github.com/LottoExperte/HA-Video-Manager) auf GitHub öffnen.
 2. Home Assistant → **Einstellungen → Marketplace** → **Aus Link hinzufügen**.
 3. Als GitHub-Link `https://github.com/LottoExperte/HA-Video-Manager` eintragen. Home Assistant fragt bei Bedarf nach der GitHub-Verbindung. Typ **Integration** auswählen, falls abgefragt.
 4. Repository öffnen und **Installieren** auswählen.
@@ -45,6 +48,14 @@ hoffmann_video_ha:
 
 Wenn dieselbe Integration bereits manuell unter `/config/custom_components/hoffmann_video_ha` installiert wurde, vor einem Wechsel zu Marketplace-Konfiguration und Home Assistant sichern, und keine zweite Kopie parallel installieren. Der Marketplace verwaltet dieselben Integrationsdateien.
 
+## Dateiformate, MOV und TS-Aufnahmen
+
+Die Liste zeigt nur Videodateien. Über die Kontrollkästchen unter **Dateiformate** lassen sich AVI, MPG/MPEG, MP4/M4V, MKV, TS, **MOV** sowie weitere vorhandene Dateitypen gezielt ein- oder ausblenden. Die Zahlen in Klammern zeigen, wie viele Dateien des jeweiligen Typs **im gescannten Katalog** sind. **Alle** schaltet alle Formate wieder ein. Die Auswahl filtert nur im Browser und ändert keine Dateien oder Metadaten.
+
+`.ts` (auch `.TS`), `.mov` (auch `.MOV`), `.m2ts`, `.mts`, `.m2t`, `.trp` und `.tp` werden beim Scan berücksichtigt. Nach einem Update bitte Home Assistant neu starten, im Video-Manager **Filme neu einlesen** wählen und gegebenenfalls die Seite neu laden. Wenn **TS (0)** angezeigt wird, den tatsächlichen Dateinamen und die Position unterhalb des konfigurierten `media_root` prüfen.
+
+**Wichtig:** Die Auflistung eines TS-Videos bedeutet noch nicht, dass jeder Browser dessen MPEG-TS-Inhalt nativ wiedergeben kann. Das hängt vom Browser und den enthaltenen Codecs ab; die Integration wandelt Videos nicht um.
+
 ## NFO-Dateien
 
 Beispiel:
@@ -55,7 +66,11 @@ Beispiel:
     Der-König-der-Löwen-1994.nfo
 ```
 
-Die `.nfo` muss den gleichen Basisdateinamen besitzen. `movie.nfo` wird ebenfalls unterstützt, falls der Ordner nur eine Videodatei enthält. Ohne NFO werden Titel und Erscheinungsjahr nach Möglichkeit aus dem Dateinamen abgeleitet.
+**NFO-Dateien werden nicht als eigener Film angezeigt.** Sie werden nur als Zusatzdaten gelesen. Im regulären Menü **Home Assistant → Medien** können die Dateien weiterhin sichtbar sein; unsere Integration verändert den eingebauten Home-Assistant-Medienbrowser nicht.
+
+Die `.nfo` wird bevorzugt über den gleichen Basisdateinamen zugeordnet. Auch verschiedene Unicode-Schreibweisen oder Trennzeichen werden erkannt, solange die Zuordnung eindeutig bleibt. Alternativ berücksichtigt die Integration den Dateinamen-Eintrag in einer Hoffmann-NFO-Datei sowie `movie.nfo` in einem Ordner mit nur einem Video. Ohne zuordenbaren NFO-Titel wird der Anzeigename aus dem Videodateinamen abgeleitet. **Im Detailfenster unter „Titelquelle“** lässt sich die verwendete Quelle prüfen. Ein erneutes Einlesen aktualisiert den Titel.
+
+**Bewertungsquelle:** Explizit als IMDb gekennzeichnete NFO-Werte werden als IMDb-Bewertung angezeigt. KI-Schätzungen werden mit `≈` und `KI` gekennzeichnet. Andere NFO-Bewertungen bleiben allgemein bezeichnet. Es wird keine Bewertung von IMDb geladen. Bitte die IMDb-Nutzungsbedingungen beachten.
 
 ## Wiedergabe und Sicherheit
 
@@ -67,7 +82,7 @@ Nicht alle Browser spielen MKV/AVI-Dateien oder darin enthaltene Codecs ab. Ein 
 
 ## Updates
 
-Weitere Versionen werden als Änderung im GitHub-Repository und **GitHub-Release** mit Versionstag veröffentlicht, beispielsweise `v1.0.1`. Anschließend zeigt Home Assistant über den Marketplace die verfügbaren Updates an. Nach Änderungen an der Python-Integration Home Assistant neu starten.
+Weitere Versionen werden als Änderung im GitHub-Repository und **GitHub-Release** mit einer jeweils höheren Versionsnummer veröffentlicht. Anschließend zeigt Home Assistant über den Marketplace die verfügbaren Updates an. Nach Änderungen an der Python-Integration Home Assistant neu starten.
 
 ## Fehlerdiagnose
 

@@ -1,0 +1,28 @@
+HA Video-Manager V1.0.1 - KOMPLETTUPDATE ab GitHub-Version V1.0.0
+=================================================================
+
+Dieses Paket vereint ALLE bisher vorbereiteten Änderungen:
+- Filmtitel aus NFO bevorzugt; Dateiname nur ohne zuordenbaren NFO-Titel.
+- Zuordnung auch bei abweichenden Trennzeichen/Unicode oder NFO-Dateiname-Hinweis.
+- Zusatzdateien (.nfo usw.) werden nicht als Filme angezeigt.
+- IMDb-Bewertung in der Liste, inkl. Sortierfunktion; KI-Schätzungen markiert.
+- Format-Auswahl mit Häkchen: AVI, MPG, MPEG, MP4, MKV, TS, MOV und weitere.
+- Dateiscan für .ts/.TS, .mov/.MOV und verwandte Videoformate.
+- Formatfilter pro Browser gespeichert; keine Änderung der Video-/NFO-Dateien.
+
+1. ZIP nach C:\Users\Administrator\source\repos\HA-Video-Manager
+   entpacken und bestehende Dateien ersetzen (Ordnerstruktur beibehalten).
+2. In PowerShell:
+   cd C:\Users\Administrator\source\repos\HA-Video-Manager
+   git add .
+   git commit -m "HA Video-Manager v1.0.1: Formatauswahl, TS, MOV und Bewertung"
+   git push origin main
+   git tag v1.0.1
+   git push origin v1.0.1
+3. Auf GitHub unter Releases v1.0.1 mit bestehendem Tag veröffentlichen.
+4. In Home Assistant aktualisieren, neu starten und "Filme neu einlesen".
+   Falls eine alte Oberfläche angezeigt wird: Browser mit Strg+F5 neu laden.
+
+WICHTIG: Aktueller GitHub-Stand laut Nutzer: V1.0.0, daher naechste V1.0.1.
+WICHTIG: Das Erkennen einer TS-/MOV-Datei garantiert nicht, dass jeder Browser
+        die darin verwendeten Codecs wiedergeben kann.

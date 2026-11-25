@@ -1,9 +1,34 @@
 /**
- * Hoffmann Video-Manager Home Assistant V1.0
+ * Hoffmann Video-Manager Home Assistant V1.0.1
  * No AI, no images, no user management, no external servers.
  * Uses authenticated Home Assistant WebSocket and a fresh media-source URL per play.
  */
 class HoffmannVideoHAPanel extends HTMLElement {
+  // Extensions are explicit: .nfo, subtitles and pictures never appear as films.
+  static FORMAT_GROUPS = [
+    {id:'avi', label:'AVI', extensions:['avi']},
+    {id:'mpg', label:'MPG/MPEG', extensions:['mpg','mpeg','m2v']},
+    {id:'mp4', label:'MP4/M4V', extensions:['mp4','m4v']},
+    {id:'mkv', label:'MKV', extensions:['mkv']},
+    {id:'ts', label:'TS', extensions:['ts']},
+    {id:'m2ts', label:'M2TS/MTS', extensions:['m2ts','mts','m2t','trp','tp']},
+    {id:'mov', label:'MOV', extensions:['mov']},
+    {id:'wmv', label:'WMV', extensions:['wmv']},
+    {id:'webm', label:'WEBM', extensions:['webm']},
+    {id:'flv', label:'FLV', extensions:['flv']},
+    {id:'vob', label:'VOB', extensions:['vob']},
+    {id:'3gp', label:'3GP', extensions:['3gp']},
+  ];
+  static VIDEO_EXTENSIONS = new Set(HoffmannVideoHAPanel.FORMAT_GROUPS.flatMap(g=>g.extensions));
+  static FORMAT_STORAGE_KEY = 'hoffmann_video_ha.selected_formats.v1';
+  static extensionOf(movie) {
+    const ext = String(movie.extension || String(movie.filename||'').split('.').pop()).trim().toLowerCase().replace(/^\./,'');
+    return ext;
+  }
+  static groupForExtension(extension) {
+    const ext=String(extension||'').toLowerCase().replace(/^\./,'');
+    return HoffmannVideoHAPanel.FORMAT_GROUPS.find(g=>g.extensions.includes(ext))?.id || null;
+  }
   constructor() {
     super();
     this.attachShadow({mode:'open'});
@@ -16,6 +41,15 @@ class HoffmannVideoHAPanel extends HTMLElement {
     this._pageSize = 70;
     this._genres = [];
     this._busy = false;
+    // Only a local display preference; the central media catalog remains untouched.
+    this._selectedFormats = new Set(HoffmannVideoHAPanel.FORMAT_GROUPS.map(g=>g.id));
+    try {
+      const saved=JSON.parse(localStorage.getItem(HoffmannVideoHAPanel.FORMAT_STORAGE_KEY)||'null');
+      if(Array.isArray(saved)) {
+        const allowed=new Set(HoffmannVideoHAPanel.FORMAT_GROUPS.map(g=>g.id));
+        this._selectedFormats=new Set(saved.filter(id=>allowed.has(id)));
+      }
+    } catch { /* Private browsing or storage may be unavailable. */ }
   }
   set hass(value) {
     this._hass = value;
@@ -44,6 +78,12 @@ header{display:flex;justify-content:space-between;align-items:center;gap:12px;fl
 h1{font-size:22px;line-height:1.25;margin:0;font-weight:650}.muted{color:var(--secondary-text-color,#707782)}.meta{font-size:12px;min-height:19px}
 .toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;padding:11px 0 14px}.toolbar input,.toolbar select{border:1px solid var(--divider-color,#d2d7dc);color:var(--primary-text-color,#1e2630);background:var(--card-background-color,#fff);border-radius:7px;padding:9px 11px;min-height:39px}
 .toolbar input{flex:1 1 270px;min-width:150px}.toolbar select{flex:0 1 auto;max-width:220px}
+.formatbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;border-top:1px solid var(--divider-color,#d2d7dc);border-bottom:1px solid var(--divider-color,#d2d7dc);padding:9px 0;margin-bottom:9px}
+.formatbar strong{font-size:13px;white-space:nowrap}.format-options{display:flex;gap:5px 12px;flex-wrap:wrap;align-items:center;flex:1 1 450px}
+.format-option{display:inline-flex;gap:5px;align-items:center;font-size:12px;white-space:nowrap;cursor:pointer;user-select:none}
+.format-option input{margin:0;accent-color:var(--primary-color,#1976d2);width:15px;height:15px;cursor:pointer}
+.format-option .format-number{color:var(--secondary-text-color,#707782);font-size:11px}
+.formatbar .button{min-height:29px;padding:4px 10px;font-size:12px}
 .button{border:1px solid var(--divider-color,#c7ccd1);color:var(--primary-text-color,#1e2630);background:var(--card-background-color,#fff);border-radius:7px;padding:8px 11px;min-height:36px;white-space:nowrap}
 .button:hover{background:var(--secondary-background-color,#eef1f4)}.primary{color:var(--text-primary-color,#fff);background:var(--primary-color,#1976d2);border-color:var(--primary-color,#1976d2)}.primary:hover{filter:brightness(.92);background:var(--primary-color,#1976d2)}
 .count{padding:6px 0 11px;font-size:13px;color:var(--secondary-text-color,#66717e)}.status{min-height:23px;font-size:13px}.status.error{color:var(--error-color,#c62828)}
@@ -61,17 +101,22 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
 @media(max-width:750px){table{min-width:0}main{padding:12px 9px 25px}h1{font-size:19px}th,td{padding:8px}.toolbar{gap:6px}.toolbar input{flex-basis:100%}.actions button{font-size:12px}.hide-sm{display:none}}
 </style>
 <main>
- <header><div><h1>Hoffmann Video-Manager</h1><div class="meta muted">Home Assistant · Filme aus „Meine Medien“ · NFO-Zusatzdateien</div></div>
+ <header><div><h1>Hoffmann Video-Manager</h1><div class="meta muted">Version 1.0.1 · Home Assistant · Filme aus „Meine Medien“ · NFO-Zusatzdateien</div></div>
  <button type="button" id="scan" class="button">↻ Filme neu einlesen</button></header>
  <div id="status" class="status muted" role="status">Katalog wird geladen …</div>
  <div class="toolbar">
   <input type="search" id="search" aria-label="Film suchen" placeholder="Film suchen (Titel, Jahr, Genre, Darsteller, Ordner) …" autocomplete="off">
   <select id="genre" aria-label="Genre"><option value="">Alle Genres</option></select>
   <select id="seen" aria-label="Gesehen"><option value="">Alle Filme</option><option value="unseen">Noch nicht gesehen</option><option value="seen">Schon gesehen</option><option value="favorites">Favoriten</option><option value="nfo">Mit NFO</option><option value="no-nfo">Ohne NFO</option></select>
-  <select id="sort" aria-label="Sortieren"><option value="title">Titel A–Z</option><option value="year-desc">Jahr absteigend</option><option value="year-asc">Jahr aufsteigend</option><option value="folder">Ordner</option></select>
+  <select id="sort" aria-label="Sortieren"><option value="title">Titel A–Z</option><option value="year-desc">Jahr absteigend</option><option value="year-asc">Jahr aufsteigend</option><option value="folder">Ordner</option><option value="rating-desc">Bewertung absteigend</option></select>
+ </div>
+ <div class="formatbar" aria-label="Videoformate filtern">
+   <strong>Dateiformate:</strong>
+   <div id="formats" class="format-options" role="group" aria-label="Videoformate auswählen"></div>
+   <button type="button" id="formatsAll" class="button" title="Alle Videoformate anzeigen">Alle</button>
  </div>
  <div id="count" class="count"></div>
- <div class="table-wrap"><table><thead><tr><th>Film</th><th>Jahr</th><th class="hide-sm">Genre</th><th class="hide-sm">Laufzeit</th><th class="hide-sm">Ordner</th><th style="text-align:right">Aktion</th></tr></thead><tbody id="rows"></tbody></table><div id="empty" class="empty" hidden>Keine Filme gefunden.</div></div>
+ <div class="table-wrap"><table><thead><tr><th>Film</th><th>Jahr</th><th class="hide-sm">Genre</th><th>Bewertung</th><th class="hide-sm">Laufzeit</th><th class="hide-sm">Ordner</th><th style="text-align:right">Aktion</th></tr></thead><tbody id="rows"></tbody></table><div id="empty" class="empty" hidden>Keine Filme gefunden.</div></div>
  <div class="paging" id="paging"><button type="button" id="prev" class="button">← Zurück</button><span id="pageinfo"></span><button type="button" id="next" class="button">Weiter →</button></div>
 </main>
 <dialog id="details"><h2 id="detailTitle"></h2><dl class="detail" id="detailFields"></dl><div class="plot" id="detailPlot"></div><div class="detail-foot"><a id="imdbLink" target="_blank" rel="noopener noreferrer" hidden>IMDb öffnen</a><button type="button" class="button" id="detailClose">Schließen</button></div></dialog>
@@ -83,6 +128,10 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
     this.$('genre').addEventListener('change',()=>this._applyFilters());
     this.$('seen').addEventListener('change',()=>this._applyFilters());
     this.$('sort').addEventListener('change',()=>this._applyFilters());
+    this.$('formatsAll').addEventListener('click',()=>{
+      this._selectedFormats=new Set(HoffmannVideoHAPanel.FORMAT_GROUPS.map(g=>g.id));
+      this._saveFormatSelection();this._renderFormatFilters();this._applyFilters();
+    });
     this.$('prev').addEventListener('click',()=>{this._page=Math.max(0,this._page-1);this._renderRows();});
     this.$('next').addEventListener('click',()=>{this._page++;this._renderRows();});
     this.$('detailClose').addEventListener('click',()=>this.$('details').close());
@@ -101,26 +150,59 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
     try {
       const data=await this._hass.connection.sendMessagePromise({type:'hoffmann_video_ha/library',refresh:Boolean(refresh)});
       if(!Array.isArray(data.movies))throw Error('Die Serverantwort enthält keine Filmliste.');
-      this._library=data.movies;
+      // Keep the table video-only even if an older cache or upstream API returns sidecars.
+      this._library=data.movies.filter(m=>HoffmannVideoHAPanel.VIDEO_EXTENSIONS.has(HoffmannVideoHAPanel.extensionOf(m)));
       this._genres=[...new Set(this._library.flatMap(m=>Array.isArray(m.genres)?m.genres:[]))]
         .filter(Boolean).sort((a,b)=>a.localeCompare(b,'de'));
       const genre=this.$('genre');const previous=genre.value;
       genre.replaceChildren(new Option('Alle Genres',''));
       for(const name of this._genres)genre.add(new Option(name,name));
       if(this._genres.includes(previous))genre.value=previous;
+      this._renderFormatFilters();
       const when=data.scanned_at ? new Date(data.scanned_at).toLocaleString('de-DE') : 'unbekannt';
-      this._setStatus(`${data.count} Videos · ${data.nfo_count} NFO-Dateien · Katalog vom ${when}`);
-      if(data.errors?.length)this._setStatus(`${data.count} Videos · ${data.nfo_count} NFO · Hinweise: ${data.errors.slice(0,2).join(' | ')}`);
+      this._setStatus(`${this._library.length} Videos · Zusatzdaten für ${data.nfo_count} Filme · Katalog vom ${when}`);
+      if(data.errors?.length)this._setStatus(`${this._library.length} Videos · Zusatzdaten für ${data.nfo_count} Filme · Hinweise: ${data.errors.slice(0,2).join(' | ')}`);
       this._applyFilters();
     } catch(err) {
       this._setStatus(`Katalog konnte nicht geladen werden: ${err?.message||String(err)}. Medienpfad in configuration.yaml prüfen.`,true);
     } finally {btn.disabled=false;this._busy=false;}
   }
   _setStatus(message,error=false){const el=this.$('status');el.textContent=message;el.className=error?'status error':'status muted';}
+  _saveFormatSelection(){
+    try { localStorage.setItem(HoffmannVideoHAPanel.FORMAT_STORAGE_KEY,JSON.stringify([...this._selectedFormats])); }
+    catch { /* In private mode the selection remains valid for this page. */ }
+  }
+  _renderFormatFilters(){
+    const holder=this.$('formats');holder.replaceChildren();
+    const counts=new Map(HoffmannVideoHAPanel.FORMAT_GROUPS.map(g=>[g.id,0]));
+    for(const movie of this._library){
+      const id=HoffmannVideoHAPanel.groupForExtension(HoffmannVideoHAPanel.extensionOf(movie));
+      if(id)counts.set(id,(counts.get(id)||0)+1);
+    }
+    // Keep commonly requested formats visible even when no films of that type were found.
+    const basic=new Set(['avi','mpg','mp4','mkv','ts','mov']);
+    for(const group of HoffmannVideoHAPanel.FORMAT_GROUPS){
+      const count=counts.get(group.id)||0;
+      if(!count&&!basic.has(group.id))continue;
+      const label=this._node('label','format-option');
+      const checkbox=document.createElement('input');checkbox.type='checkbox';
+      checkbox.checked=this._selectedFormats.has(group.id);
+      checkbox.setAttribute('aria-label',`${group.label} anzeigen (${count} Filme)`);
+      checkbox.addEventListener('change',()=>{
+        if(checkbox.checked)this._selectedFormats.add(group.id);
+        else this._selectedFormats.delete(group.id);
+        this._saveFormatSelection();this._applyFilters();
+      });
+      label.append(checkbox,this._node('span','',group.label),this._node('span','format-number',`(${count})`));
+      holder.append(label);
+    }
+  }
   _applyFilters(){
     const q=this.$('search').value.trim().toLocaleLowerCase('de');
     const g=this.$('genre').value, seen=this.$('seen').value, sort=this.$('sort').value;
     this._filtered=this._library.filter(m=>{
+      const formatId=HoffmannVideoHAPanel.groupForExtension(HoffmannVideoHAPanel.extensionOf(m));
+      if(!formatId||!this._selectedFormats.has(formatId))return false;
       if(q&&![m.title,m.original_title,m.year,m.genre,m.director,m.actors,m.filename,m.folder].join(' ').toLocaleLowerCase('de').includes(q))return false;
       if(g&&!(m.genres||[]).includes(g))return false;
       if(seen==='seen'&&!(m.playcount>0||m.seen_date))return false;
@@ -136,6 +218,7 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
         case 'year-desc':return (b.year||0)-(a.year||0)||cmp(a.title,b.title);
         case 'year-asc':return (a.year||9999)-(b.year||9999)||cmp(a.title,b.title);
         case 'folder':return cmp(a.folder,b.folder)||cmp(a.title,b.title);
+        case 'rating-desc':return (Number(b.rating)||0)-(Number(a.rating)||0)||cmp(a.title,b.title);
         default:return cmp(a.title,b.title);
       }
     });
@@ -149,10 +232,13 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
     for(const m of items){
       const tr=this._node('tr');
       const titleCell=this._node('td');titleCell.append(this._node('div','name',m.title||m.filename));
-      const hint=[m.has_nfo?'NFO':'Dateiname',m.favorite?'★ Favorit':'',m.playcount>0?'Gesehen':''].filter(Boolean).join(' · ');
-      titleCell.append(this._node('div','sub',hint));tr.append(titleCell);
+      const hint=[HoffmannVideoHAPanel.extensionOf(m).toUpperCase(),m.favorite?'★ Favorit':'',m.playcount>0?'Gesehen':''].filter(Boolean).join(' · ');
+      if(hint)titleCell.append(this._node('div','sub',hint));tr.append(titleCell);
       tr.append(this._node('td','nowrap',m.year||'–'));
       const genreCell=this._node('td','hide-sm',m.genre||'–');tr.append(genreCell);
+      const ratingCell=this._node('td','nowrap',this._ratingLabel(m));
+      ratingCell.title=this._ratingDescription(m);
+      tr.append(ratingCell);
       const length=m.duration_seconds?`${Math.round(m.duration_seconds/60)} min`:'–';tr.append(this._node('td','hide-sm nowrap',length));
       const folderCell=this._node('td','hide-sm');folderCell.append(this._node('div','sub',m.folder||'Hauptordner'));tr.append(folderCell);
       const actionCell=this._node('td');const actionWrap=this._node('div','actions');
@@ -169,10 +255,22 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
     this.$('prev').disabled=this._page===0;
     this.$('next').disabled=this._page>=pages-1;
   }
+  _ratingLabel(m){
+    const v=Number(m.rating);
+    if(m.rating===null||m.rating===undefined||m.rating===''||!Number.isFinite(v)||v<=0||v>10)return '–';
+    const formatted=v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
+    if(m.rating_estimated||String(m.rating_source||'').toLowerCase().includes('schätzung'))return `≈ ${formatted} (KI)`;
+    return `${formatted} / 10`;
+  }
+  _ratingDescription(m){
+    if(this._ratingLabel(m)==='–')return 'Keine Bewertung in NFO vorhanden';
+    const source=String(m.rating_source||'NFO');
+    return source==='IMDb'?'IMDb-Bewertung aus lokaler NFO (möglicherweise nicht aktuell)':`Bewertungsquelle: ${source}`;
+  }
   _showDetails(m){
     this.$('detailTitle').textContent=m.title||m.filename;
     const dl=this.$('detailFields');dl.replaceChildren();
-    const fields=[['Originaltitel',m.original_title],['Jahr',m.year],['Genre',m.genre],['Regie',m.director],['Darsteller',m.actors],['Laufzeit',m.duration_seconds?`${Math.round(m.duration_seconds/60)} Minuten`:null],['IMDb-ID',m.imdb_id],['Wikidata',m.wikidata_id],['IMDb-Bewertung',m.rating],['Eigene Bewertung',m.own_rating],['Gesehen',m.seen_date||((m.playcount>0)?'Ja':null)],['Datei',m.filename],['Ordner',m.folder||'Hauptordner'],['Zusatzdatei',m.has_nfo?'NFO vorhanden':'Keine NFO']];
+    const fields=[['Originaltitel',m.original_title],['Titelquelle',m.title_source||(m.has_nfo?'NFO':'Dateiname')],['Jahr',m.year],['Genre',m.genre],['Regie',m.director],['Darsteller',m.actors],['Laufzeit',m.duration_seconds?`${Math.round(m.duration_seconds/60)} Minuten`:null],['IMDb-ID',m.imdb_id],['Wikidata',m.wikidata_id],['Bewertung',this._ratingLabel(m)==='–'?null:this._ratingLabel(m)],['Bewertungsquelle',m.rating_source||null],['Eigene Bewertung',m.own_rating],['Gesehen',m.seen_date||((m.playcount>0)?'Ja':null)],['Datei',m.filename],['Ordner',m.folder||'Hauptordner'],['Zusatzdatei',m.has_nfo?'NFO vorhanden':'Keine NFO']];
     for(const [label,value] of fields){if(value===null||value===undefined||value==='')continue;dl.append(this._node('dt','',label),this._node('dd','',value));}
     this.$('detailPlot').textContent=m.plot||'';
     const imdb=this.$('imdbLink');

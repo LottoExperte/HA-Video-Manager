@@ -1,57 +1,47 @@
-# GitHub-Repository veröffentlichen – einmaliger Schritt
+# HA Video-Manager: GitHub und Home Assistant
 
-Das ZIP enthält **ein echtes Git-Repository**: einschließlich des versteckten Ordners `.git`, des Branches `main` und des Versions-Tags `v1.0.0`. Es ist noch **nicht** auf GitHub online.
+Das öffentliche GitHub-Repository **existiert bereits**:
+https://github.com/LottoExperte/HA-Video-Manager
 
-## A. Empfohlen: automatisiert unter deinem Konto `LottoExperte`
+Das erste Release ist `v1.0.0`. Das aktuelle Update wird deshalb `v1.0.1`
+und bündelt alle Korrekturen und neuen Funktionen seit `v1.0.0`.
 
-1. ZIP in einen eigenen Ordner entpacken, dabei auch `.git` beibehalten.
-2. Auf Windows **Git** und **GitHub CLI (`gh`)** installieren, falls noch nicht vorhanden:
+## Update V1.0.1 veröffentlichen
+
+1. Das ZIP **HA-Video-Manager-v1.0.1-inkl-MOV-TS-Bewertung.zip** entpacken
+   und die darin enthaltenen Dateien unter
+   `C:\Users\Administrator\source\repos\HA-Video-Manager`
+   über die vorhandenen Dateien kopieren.
+2. Im lokalen Repository PowerShell ausführen:
 
    ```powershell
-   winget install --id Git.Git -e
-   winget install --id GitHub.cli -e
+   cd C:\Users\Administrator\source\repos\HA-Video-Manager
+   git status
+   git add .
+   git commit -m "HA Video-Manager v1.0.1: Formatauswahl, TS, MOV und Bewertung"
+   git push origin main
+   git tag v1.0.1
+   git push origin v1.0.1
    ```
+3. Auf GitHub unter **Releases** das Release `v1.0.1` mit dem
+   **bereits vorhandenen Tag** `v1.0.1` veröffentlichen.
+4. Das Update im Home-Assistant-Marketplace einspielen und Home Assistant
+   neu starten. Im Video-Manager anschließend **Filme neu einlesen**.
 
-   Danach ein neues PowerShell-Fenster öffnen.
-3. PowerShell im entpackten Repositoryordner öffnen und ausführen:
+**Keine Version überspringen:** Vom bisher veröffentlichten `v1.0.0` geht es jetzt zu `v1.0.1`.
 
-   ```powershell
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\REPOSITORY-VEROEFFENTLICHEN.ps1"
-   ```
+Hinweis: Wenn das Release bereits anders erstellt wurde, vor einer erneuten
+Vergabe des Tags zunächst den Zustand auf GitHub prüfen. Tags nicht
+gewaltsam überschreiben.
 
-4. Gegebenenfalls die GitHub-Anmeldung im Browser durchführen. Das Skript kontrolliert ausdrücklich, dass du als `LottoExperte` angemeldet bist.
-5. Die öffentliche Veröffentlichung mit **JA** bestätigen.
+## Home Assistant konfigurieren (einmalig)
 
-Das Skript legt `https://github.com/LottoExperte/HA-Video-Manager` an, überträgt den fertigen Git-Verlauf und veröffentlicht das Release `v1.0.0`. Falls du das Repository im Browser bereits **leer** angelegt hast, wird es befüllt. Ein Repository mit vorhandenen Commits/Dateien wird **nicht überschrieben**.
+In `/config/configuration.yaml`:
 
-Das Skript benötigt deine eigene GitHub-Anmeldung. Es enthält keine Zugangsdaten.
+```yaml
+hoffmann_video_ha:
+  media_root: /media/Videorecorder/Backup/Video
+```
 
-## B. Alternative: nur über die GitHub-Webseite
-
-1. Unter https://github.com/new ein leeres Repository `HA-Video-Manager` als **Public** erstellen. Kein zusätzliches README, keine Lizenz und keine `.gitignore` auf GitHub anlegen (Repository muss leer sein).
-2. Die **Dateien aus dem entpackten ZIP** hochladen; die ZIP-Datei selbst NICHT hochladen. Den Ordner `.git` NICHT mit hochladen. Achte auf `hacs.json` direkt im Repository-Hauptverzeichnis und die Ordnerstruktur `custom_components/hoffmann_video_ha/...`.
-3. GitHub: **Releases** > **Create a new release** > Tag `v1.0.0` erstellen und veröffentlichen.
-
-*Hinweis:* Die Funktion „GitHub Importer“ importiert bestehende **online erreichbare Git-Repositories** und akzeptiert kein ZIP als Git-Repository. Deshalb enthält dieses Paket den optionalen Veröffentlichungsassistenten.
-
-## C. Installation in Home Assistant 2026.11+
-
-1. Home Assistant öffnen: **Einstellungen > Marketplace > Aus Link hinzufügen**.
-2. Link einfügen: `https://github.com/LottoExperte/HA-Video-Manager`.
-3. Bei Bedarf GitHub mit Home Assistant verbinden. Typ: **Integration**.
-4. Integration **Installieren**.
-5. Einmalig in `/config/configuration.yaml`:
-
-   ```yaml
-   hoffmann_video_ha:
-     media_root: /media/Videorecorder/Backup/Video
-   ```
-
-   `local` gehört nicht in den Dateisystempfad, sondern zur Medien-URL `/media/local/...`.
-6. Home Assistant neu starten; links **Video-Manager** öffnen.
-
-**Wichtig:** Installiere nicht parallel eine manuell kopierte und eine Marketplace-Version derselben Integration. Home-Assistant-Konfiguration vorher sichern.
-
-## Spätere Updates
-
-Neue Version in `custom_components/hoffmann_video_ha/manifest.json` setzen, Git-Änderungen pushen, neues GitHub-Release z. B. `v1.0.1` veröffentlichen. Der Marketplace zeigt Updates an.
+`local` gehört normalerweise nur zum Medien-URL-Schema, nicht in den
+Dateisystempfad. Nach der Konfiguration Home Assistant neu starten.

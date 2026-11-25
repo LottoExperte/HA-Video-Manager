@@ -8,15 +8,20 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
 VIDEO_SUFFIXES = frozenset({
     ".mkv", ".mp4", ".m4v", ".mov", ".avi", ".wmv", ".webm",
-    ".mpg", ".mpeg", ".ts", ".m2ts", ".mts", ".flv", ".vob", ".3gp",
+    ".mpg", ".mpeg", ".m2v", ".ts", ".m2ts", ".mts", ".m2t", ".trp", ".tp",
+    ".flv", ".vob", ".3gp",
 })
 MAX_NFO_BYTES = 2_000_000
+
+# Explicit allowlist: sidecars (.nfo, subtitles, posters) are never video rows.
+
 IMDB_PATTERN = re.compile(r"^tt\d{7,12}$")
 WIKIDATA_PATTERN = re.compile(r"^Q\d+$")
 YEAR_PATTERN = re.compile(r"(?<!\d)(?:19\d{2}|20\d{2})(?!\d)")
@@ -39,6 +44,66 @@ def _numeric(value: str, default: int = 0) -> int:
         return int(float(value))
     except (TypeError, ValueError, OverflowError):
         return default
+
+
+def _rating_number(value: str) -> float | None:
+    """Accept 7.4 and German 7,4; never treat text as a numeric rating."""
+    text = (value or "").strip().replace(",", ".")
+    try:
+        number = float(text)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    if not (0 < number <= 10):
+        return None
+    return round(number, 1)
+
+
+def _nfo_rating(root: ET.Element, extra: ET.Element | None) -> tuple[float | None, str, bool]:
+    """Find IMDb rating before other ratings; never label an estimate as IMDb.
+
+    Supports Kodi <ratings>, simple <rating>, and common additional sidecar tags.
+    Only ratings explicitly tagged IMDb are attributed to IMDb.
+    """
+    ratings = root.find("ratings")
+    tagged = []
+    if ratings is not None:
+        for item in ratings.findall("rating"):
+            source = (item.get("name") or item.get("source") or "").strip().casefold()
+            raw = _child_value(item, "value") or (item.text or "").strip()
+            value = _rating_number(raw)
+            if value is not None:
+                tagged.append((source, value))
+
+    # Confirmed IMDb rating always wins over estimated/local ratings.
+    for source, value in tagged:
+        if source in {"imdb", "imdb.com"}:
+            return value, "IMDb", False
+    for tag in ("imdb_rating", "imdbrating", "imdbscore", "imdb"):
+        value = _rating_number(_child_value(root, tag) or _child_value(extra, tag))
+        if value is not None:
+            return value, "IMDb", False
+    for source, value in tagged:
+        if source in {"hoffmann-ki-estimate", "ki-schaetzung", "ai-estimate", "ai_estimate"}:
+            return value, "KI-Schätzung", True
+    # Standard Kodi single <rating> does not necessarily mean IMDb.
+    for tag in ("rating", "score"):
+        value = _rating_number(_child_value(root, tag))
+        if value is not None:
+            return value, "NFO", False
+    if tagged:
+        return tagged[0][1], tagged[0][0] or "NFO", False
+    return None, "", False
+
+
+def _file_key(name: str) -> str:
+    """Normalize Unicode/case; Samba shares can report composed/decomposed names."""
+    return unicodedata.normalize("NFC", name).casefold()
+
+
+def _stem_key(name: str) -> str:
+    """Match sidecars when only punctuation/spaces differ (if unambiguous)."""
+    stem = Path(name).stem
+    return "".join(ch for ch in _file_key(stem) if ch.isalnum())
 
 
 def _name_from_filename(stem: str) -> tuple[str, int | None]:
@@ -84,15 +149,8 @@ def read_nfo(path: Path) -> dict[str, Any]:
     genre_list = _children_values(root, "genre")
     # Respect Kodi and Hoffmann multi-element genre representation
     genre_list = [g.strip() for item in genre_list for g in re.split(r"[,;|]+", item) if g.strip()]
-    rating = ""
-    ratings = root.find("ratings")
-    if ratings is not None:
-        for item in ratings.findall("rating"):
-            rating_name = item.get("name", "")
-            if rating_name in {"imdb", "hoffmann-ki-estimate"}:
-                rating = _child_value(item, "value")
-                break
-    title = _child_value(root, "title")
+    rating, rating_source, rating_estimated = _nfo_rating(root, extra)
+    title = _child_value(root, "title") or _child_value(root, "originaltitle")
     if not title:
         return {}
     year = _numeric(_child_value(root, "year")) or None
@@ -100,6 +158,9 @@ def read_nfo(path: Path) -> dict[str, Any]:
     played = _numeric(_child_value(extra, "times") or _child_value(root, "playcount"))
     return {
         "title": title,
+        # Optional hint written by the Hoffmann desktop Video-Manager.
+        # Used solely to associate a sidecar with the correct media file.
+        "filename_hint": _child_value(extra, "filename"),
         "original_title": _child_value(root, "originaltitle"),
         "year": year,
         "genre": ", ".join(dict.fromkeys(genre_list)),
@@ -111,6 +172,8 @@ def read_nfo(path: Path) -> dict[str, Any]:
         "wikidata_id": wiki_id,
         "duration_seconds": duration_seconds,
         "rating": rating,
+        "rating_source": rating_source,
+        "rating_estimated": rating_estimated,
         "own_rating": _child_value(extra, "own_rating"),
         "seen_date": seen_date,
         "playcount": played,
@@ -138,12 +201,39 @@ def scan_library(root: str, source_prefix: str, max_files: int = 50000) -> dict[
     for parent, dirs, filenames in os.walk(library_root, topdown=True, followlinks=False):
         dirs[:] = [d for d in sorted(dirs, key=str.casefold)
                    if not (Path(parent) / d).is_symlink() and not d.startswith(".")]
-        filename_set = {name.lower(): name for name in filenames}
-        video_filenames = sorted((name for name in filenames if Path(name).suffix.lower() in VIDEO_SUFFIXES), key=str.casefold)
+        video_filenames = sorted(
+            (name for name in filenames if Path(name).suffix.casefold() in VIDEO_SUFFIXES),
+            key=str.casefold,
+        )
+        nfo_filenames = sorted(
+            (name for name in filenames if Path(name).suffix.casefold() == ".nfo"),
+            key=str.casefold,
+        )
+        # Build an index once per folder. Unlike strict basename matching, this
+        # also supports minor punctuation differences and the original filename
+        # embedded in sidecars written by Hoffmann Video-Manager.
+        nfo_by_name: dict[str, list[str]] = {}
+        nfo_by_stem: dict[str, list[str]] = {}
+        nfo_by_hint: dict[str, list[str]] = {}
+        parsed_nfo: dict[str, dict[str, Any]] = {}
+        for name in nfo_filenames:
+            nfo_by_name.setdefault(_file_key(name), []).append(name)
+            nfo_by_stem.setdefault(_stem_key(name), []).append(name)
+            try:
+                data = read_nfo(Path(parent) / name)
+            except (OSError, UnicodeError, ValueError) as exc:
+                data = {}
+                if len(errors) < 8:
+                    errors.append(f"NFO {name}: {exc}")
+            parsed_nfo[name] = data
+            if data.get("filename_hint"):
+                hint = str(data["filename_hint"]).replace("\\", "/").rsplit("/", 1)[-1]
+                nfo_by_hint.setdefault(_file_key(hint), []).append(name)
         unique_video = len(video_filenames) == 1
+        unique_nfo = len(nfo_filenames) == 1
         for filename in video_filenames:
             path = Path(parent) / filename
-            if path.is_symlink() or not path.is_file():
+            if path.suffix.casefold() not in VIDEO_SUFFIXES or path.is_symlink() or not path.is_file():
                 continue
             video_count += 1
             if video_count > max_files:
@@ -152,20 +242,21 @@ def scan_library(root: str, source_prefix: str, max_files: int = 50000) -> dict[
             folder = path.parent.relative_to(library_root).as_posix()
             if folder == ".":
                 folder = ""
-            nfo_key = (path.stem + ".nfo").lower()
-            nfo_name = filename_set.get(nfo_key)
-            if nfo_name is None and unique_video:
-                nfo_name = filename_set.get("movie.nfo")
-            nfo: dict[str, Any] = {}
-            if nfo_name:
-                nfo_path = path.parent / nfo_name
-                try:
-                    nfo = read_nfo(nfo_path)
-                    if nfo:
-                        nfo_count += 1
-                except (OSError, UnicodeError, ValueError) as exc:
-                    if len(errors) < 8:
-                        errors.append(f"NFO {relative}: {exc}")
+            nfo_name = None
+            for candidates in (
+                nfo_by_name.get(_file_key(path.stem + ".nfo"), []),
+                nfo_by_hint.get(_file_key(filename), []),
+                nfo_by_stem.get(_stem_key(filename), []),
+                nfo_by_name.get("movie.nfo", []) if unique_video else [],
+                nfo_filenames if unique_video and unique_nfo else [],
+            ):
+                # Never guess among multiple NFO candidates for one film.
+                if len(candidates) == 1 and parsed_nfo.get(candidates[0]):
+                    nfo_name = candidates[0]
+                    break
+            nfo = parsed_nfo.get(nfo_name, {}) if nfo_name else {}
+            if nfo:
+                nfo_count += 1
             guessed_title, guessed_year = _name_from_filename(path.stem)
             media_path = "/".join(x for x in (prefix, relative) if x)
             films.append({
@@ -175,6 +266,7 @@ def scan_library(root: str, source_prefix: str, max_files: int = 50000) -> dict[
                 "filename": filename,
                 "folder": folder,
                 "title": nfo.get("title") or guessed_title,
+                "title_source": "NFO" if nfo.get("title") else "Dateiname",
                 "year": nfo.get("year") or guessed_year,
                 "genre": nfo.get("genre", ""),
                 "genres": nfo.get("genres", []),
@@ -185,7 +277,9 @@ def scan_library(root: str, source_prefix: str, max_files: int = 50000) -> dict[
                 "wikidata_id": nfo.get("wikidata_id", ""),
                 "original_title": nfo.get("original_title", ""),
                 "duration_seconds": nfo.get("duration_seconds", 0),
-                "rating": nfo.get("rating", ""),
+                "rating": nfo.get("rating"),
+                "rating_source": nfo.get("rating_source", ""),
+                "rating_estimated": nfo.get("rating_estimated", False),
                 "own_rating": nfo.get("own_rating", ""),
                 "seen_date": nfo.get("seen_date", ""),
                 "playcount": nfo.get("playcount", 0),

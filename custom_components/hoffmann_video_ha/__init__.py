@@ -1,4 +1,4 @@
-"""Hoffmann Video-Manager V1.0: fast read-only film index for HA media sources."""
+"""Hoffmann Video-Manager V1.0.1: fast read-only film index for HA media sources."""
 from __future__ import annotations
 
 import asyncio
@@ -21,6 +21,7 @@ LOGGER = logging.getLogger(__name__)
 KEY_ROOT = "media_root"
 KEY_PREFIX = "media_source_prefix"
 KEY_MAX = "max_files"
+CATALOG_SCHEMA = 4  # Re-scan sidecar title matching after upgrading
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
@@ -47,6 +48,8 @@ async def ws_library(hass, connection, msg) -> None:
             result = state.get("cache")
             if result is None and not msg["refresh"]:
                 result = await state["store"].async_load()
+                if result and result.get("catalog_schema") != CATALOG_SCHEMA:
+                    result = None
                 if result and result.get("media_root") != state["media_root"]:
                     result = None
                 if result and result.get("source_prefix") != state["source_prefix"]:
@@ -58,6 +61,7 @@ async def ws_library(hass, connection, msg) -> None:
                     state["source_prefix"],
                     state["max_files"],
                 )
+                result["catalog_schema"] = CATALOG_SCHEMA
                 result["media_root"] = state["media_root"]
                 result["source_prefix"] = state["source_prefix"]
                 result["scanned_at"] = datetime.now(timezone.utc).isoformat()
@@ -111,7 +115,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         hass,
         webcomponent_name="hoffmann-video-ha-panel",
         frontend_url_path="hoffmann-video",
-        module_url="/hoffmann_video_ha/panel.js?v=1.0.0",
+        module_url="/hoffmann_video_ha/panel.js?v=1.0.1-titel",
         sidebar_title="Video-Manager",
         sidebar_icon="mdi:filmstrip",
         require_admin=False,
