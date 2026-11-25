@@ -19,6 +19,7 @@ VIDEO_SUFFIXES = frozenset({
     ".flv", ".vob", ".3gp",
 })
 MAX_NFO_BYTES = 2_000_000
+MIN_VIDEO_BYTES = 1_000_000  # 1 MB (decimal); files smaller than this are not listed
 
 # Explicit allowlist: sidecars (.nfo, subtitles, posters) are never video rows.
 
@@ -184,13 +185,18 @@ def read_nfo(path: Path) -> dict[str, Any]:
     }
 
 
-def scan_library(root: str, source_prefix: str, max_files: int = 50000) -> dict[str, Any]:
+def scan_library(
+    root: str, source_prefix: str, max_files: int = 50000,
+    min_video_bytes: int = MIN_VIDEO_BYTES,
+) -> dict[str, Any]:
     """Scan local HA-mounted media tree; media file bytes are never read."""
     library_root = Path(root).resolve()
     if not library_root.exists():
         raise FileNotFoundError(f"Medienordner nicht vorhanden: {root}")
     if not library_root.is_dir():
         raise NotADirectoryError(f"Medienpfad ist kein Verzeichnis: {root}")
+    if min_video_bytes < 0:
+        raise ValueError("min_video_bytes darf nicht negativ sein")
     prefix = source_prefix.replace("\\", "/").strip("/")
     if any(part in ("", ".", "..") for part in prefix.split("/")):
         raise ValueError("Ungültiger media_source_prefix")
@@ -198,17 +204,33 @@ def scan_library(root: str, source_prefix: str, max_files: int = 50000) -> dict[
     errors: list[str] = []
     nfo_count = 0
     video_count = 0
-    for parent, dirs, filenames in os.walk(library_root, topdown=True, followlinks=False):
+    skipped_small = 0
+    skipped_hidden = 0
+
+    def raise_walk_error(error: OSError) -> None:
+        # Never replace a complete catalog with an incomplete scan when
+        # an SMB subtree cannot be read (e.g. transient access failure).
+        raise error
+
+    for parent, dirs, filenames in os.walk(
+        library_root, topdown=True, followlinks=False, onerror=raise_walk_error
+    ):
         dirs[:] = [d for d in sorted(dirs, key=str.casefold)
                    if not (Path(parent) / d).is_symlink() and not d.startswith(".")]
         video_filenames = sorted(
-            (name for name in filenames if Path(name).suffix.casefold() in VIDEO_SUFFIXES),
+            (name for name in filenames if Path(name).suffix.casefold() in VIDEO_SUFFIXES
+             and not name.startswith(".")),
             key=str.casefold,
         )
         nfo_filenames = sorted(
-            (name for name in filenames if Path(name).suffix.casefold() == ".nfo"),
+            (name for name in filenames if Path(name).suffix.casefold() == ".nfo"
+             and not name.startswith(".")),
             key=str.casefold,
         )
+        # Keep a diagnostic counter for dotfiles / macOS AppleDouble sidecars
+        # that happen to end in a valid video extension, e.g. ._Film.mpg.
+        skipped_hidden += sum(1 for name in filenames if name.startswith(".")
+                              and Path(name).suffix.casefold() in VIDEO_SUFFIXES)
         # Build an index once per folder. Unlike strict basename matching, this
         # also supports minor punctuation differences and the original filename
         # embedded in sidecars written by Hoffmann Video-Manager.
@@ -234,6 +256,15 @@ def scan_library(root: str, source_prefix: str, max_files: int = 50000) -> dict[
         for filename in video_filenames:
             path = Path(parent) / filename
             if path.suffix.casefold() not in VIDEO_SUFFIXES or path.is_symlink() or not path.is_file():
+                continue
+            try:
+                file_size = path.stat().st_size
+            except FileNotFoundError:
+                # A file removed during a scan must not be re-added.
+                continue
+            # Propagate other I/O failures to retain the previous catalog.
+            if file_size < min_video_bytes:
+                skipped_small += 1
                 continue
             video_count += 1
             if video_count > max_files:
@@ -264,6 +295,7 @@ def scan_library(root: str, source_prefix: str, max_files: int = 50000) -> dict[
                 "media_source_id": f"media-source://media_source/local/{media_path}",
                 "relative_path": relative,
                 "filename": filename,
+                "size_bytes": file_size,
                 "folder": folder,
                 "title": nfo.get("title") or guessed_title,
                 "title_source": "NFO" if nfo.get("title") else "Dateiname",
@@ -290,4 +322,8 @@ def scan_library(root: str, source_prefix: str, max_files: int = 50000) -> dict[
                 "has_nfo": bool(nfo),
                 "extension": path.suffix.lower(),
             })
-    return {"movies": films, "count": len(films), "nfo_count": nfo_count, "errors": errors}
+    return {
+        "movies": films, "count": len(films), "nfo_count": nfo_count,
+        "skipped_small": skipped_small, "skipped_hidden": skipped_hidden,
+        "min_video_bytes": min_video_bytes, "errors": errors,
+    }

@@ -3,6 +3,10 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+def make_video(path):
+    with path.open('wb') as f:
+        f.truncate(1_000_001)
+
 module_path = Path(__file__).resolve().parents[1] / 'custom_components' / 'hoffmann_video_ha' / 'scanner.py'
 spec = spec_from_file_location('scanner', module_path)
 scanner = module_from_spec(spec)
@@ -12,7 +16,7 @@ with TemporaryDirectory() as directory:
     root = Path(directory) / 'Videorecorder' / 'Backup' / 'Video'
     (root / 'Trickfilme').mkdir(parents=True)
     (root / 'Spielfilme').mkdir()
-    (root / 'Trickfilme' / 'Der-König-der-Löwen-Zeichentrickfilm-USA-1994-.mkv').write_bytes(b'not-a-real-video')
+    make_video(root / 'Trickfilme' / 'Der-König-der-Löwen-Zeichentrickfilm-USA-1994-.mkv')
     (root / 'Trickfilme' / 'Der-König-der-Löwen-Zeichentrickfilm-USA-1994-.nfo').write_text('''<?xml version="1.0" encoding="UTF-8"?>
 <movie><title>Der König der Löwen</title><originaltitle>The Lion King</originaltitle><year>1994</year>
 <plot>Simba wird König.</plot><runtime>88</runtime><genre>Zeichentrick</genre><genre>Abenteuer</genre>
@@ -21,7 +25,7 @@ with TemporaryDirectory() as directory:
 <uniqueid type="wikidata">Q36479</uniqueid>
 <ratings><rating name="imdb" max="10"><value>8.5</value></rating></ratings>
 <hoffmann_video_manager version="1"><own_rating>9</own_rating><favorite>true</favorite><seen_date>2026-11-25</seen_date><times>2</times><duration_seconds>5280</duration_seconds></hoffmann_video_manager></movie>''', encoding='utf-8')
-    (root / 'Spielfilme' / 'After.the.Dark.2013.mkv').write_bytes(b'')
+    make_video(root / 'Spielfilme' / 'After.the.Dark.2013.mkv')
     (root / 'Spielfilme' / 'bad.nfo').write_text('<!DOCTYPE movie [<!ENTITY x SYSTEM "file:///etc/passwd">]><movie><title>&x;</title></movie>')
     result = scanner.scan_library(str(root),'Videorecorder/Backup/Video')
     assert result['count'] == 2, result
@@ -55,7 +59,7 @@ with TemporaryDirectory() as directory:
 
     # TS-Aufnahmen (auch großgeschriebene Dateiendung) gehören in den Katalog.
     for name in ('Weihnachtsfilm-2008.ts', 'Fernsehaufnahme-2009.TS', 'Konzert-2010.m2ts', 'Reportage-2011.mts', 'TV-Film-2012.trp', 'Film-2013.tp', 'Film-2014.m2t', 'Film-2015.m2v', 'Geburtstag-2024.MOV'):
-        (root / 'Trickfilme' / name).touch()
+        make_video(root / 'Trickfilme' / name)
     transport = scanner.scan_library(str(root), 'Videorecorder/Backup/Video')
     assert transport['count'] == 11, transport
     for suffix in ('.ts', '.m2ts', '.mts', '.trp', '.tp', '.m2t', '.m2v', '.mov'):
@@ -63,7 +67,7 @@ with TemporaryDirectory() as directory:
     assert all(m['extension'] not in ('.nfo', '.srt', '.jpg') for m in transport['movies'])
 
     for n in range(150):
-        (root / 'Trickfilme' / f'Testfilm-{n:03d}-2020.mp4').touch()
+        make_video(root / 'Trickfilme' / f'Testfilm-{n:03d}-2020.mp4')
     result=scanner.scan_library(str(root),'Videorecorder/Backup/Video')
     assert result['count']==161
     assert result['nfo_count']==2

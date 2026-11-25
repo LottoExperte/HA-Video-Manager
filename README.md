@@ -1,14 +1,16 @@
 # Hoffmann Video-Manager für Home Assistant
 
-Eine schlanke, bildfreie Videothek für Home Assistant. Version **1.0.1** (Testversion).
+Eine schlanke, bildfreie Videothek für Home Assistant. Version **1.0.3** (Testversion).
 
 Diese Integration liest vorhandene Filmdateien und die zugehörigen XML-NFO-Dateien aus einer bereits in Home Assistant eingebundenen Medienfreigabe. Die Pflege und Aktualisierung der Filmdaten erfolgt weiterhin im **Hoffmann Video-Manager**.
 
 - **Keine KI-Abfragen, keine Cover, kein eigener Benutzer-Login**
 - Schnelle Tabelle mit Suche, Filtern und Sortierung; **ausschließlich Videodateien als Listeneinträge**
 - **Dateiformat-Auswahl mit Häkchen:** AVI, MPG/MPEG, MP4, MKV, TS, **MOV** und weitere vorhandene Formate; alle Formate beim ersten Start aktiviert, Auswahl bleibt im jeweiligen Browser gespeichert
-- Bewertungsanzeige bereits in der Filmliste; nach Bewertung sortieren
+- **Bewertungsfilter:** alle, nur bewertete, unbewertete oder Filme ab 5,0 bis 9,5 Punkten; zusätzlich Bewertungsquelle „Nur IMDb“ oder „Ohne KI-Schätzungen“. Bewertung absteigend sortieren bleibt möglich
 - **Filmtitel statt Dateiname:** Titel aus der passenden NFO wird in Tabelle, Suche und Wiedergabe angezeigt; Dateiname nur als Ersatz, wenn kein NFO-Titel vorliegt. Im Detailfenster steht die Titelquelle.
+- **Katalogbereinigung:** Versteckte Dateien wie `._Alles steht Kopf.mpg` und Videodateien **unter 1 MB** werden ignoriert. Die Mindestgröße ist optional in `configuration.yaml` einstellbar.
+- **Neu einlesen entfernt alte Katalogeinträge:** Umbenannte, gelöschte, ausgeblendete oder zu kleine Videos erscheinen nach dem Scan nicht mehr. **Auf dem Datenträger werden keinerlei Dateien gelöscht.** Die Anzahl entfernter Katalogeinträge wird gemeldet.
 - NFO: Titel, Jahr, Genre, Inhalt, Regie, Darsteller, Laufzeit, IMDb-ID, IMDb-Bewertung, gekennzeichnete KI-Schätzung, Favoriten und Gesehen-Status
 - Filme direkt im Home-Assistant-Browser starten (über `media_source/resolve_media`)
 - **Videos und NFO-Dateien werden ausschließlich gelesen, niemals verändert**
@@ -55,6 +57,26 @@ Die Liste zeigt nur Videodateien. Über die Kontrollkästchen unter **Dateiforma
 `.ts` (auch `.TS`), `.mov` (auch `.MOV`), `.m2ts`, `.mts`, `.m2t`, `.trp` und `.tp` werden beim Scan berücksichtigt. Nach einem Update bitte Home Assistant neu starten, im Video-Manager **Filme neu einlesen** wählen und gegebenenfalls die Seite neu laden. Wenn **TS (0)** angezeigt wird, den tatsächlichen Dateinamen und die Position unterhalb des konfigurierten `media_root` prüfen.
 
 **Wichtig:** Die Auflistung eines TS-Videos bedeutet noch nicht, dass jeder Browser dessen MPEG-TS-Inhalt nativ wiedergeben kann. Das hängt vom Browser und den enthaltenen Codecs ab; die Integration wandelt Videos nicht um.
+
+## Filme nach Bewertung filtern
+
+Oben in der Filterleiste **„Alle Bewertungen“** auswählen, z. B. **„Ab 7,0 Punkten“**. Es bleiben nur Filme mit einer Bewertung von mindestens 7,0 sichtbar. **„Mit Bewertung“** zeigt alle bewerteten Filme, **„Ohne Bewertung“** nur solche ohne gültigen NFO-Wert. Die Schwelle ist **einschließlich** des angegebenen Wertes. Die Filmliste wird sofort gefiltert; erneutes Einlesen ist dazu nicht notwendig.
+
+Mit der zusätzlichen Auswahl **„Alle Bewertungsquellen“ / „Nur IMDb-Bewertungen“ / „Ohne KI-Schätzungen“** lässt sich die Herkunft eingrenzen. „Nur IMDb“ verwendet ausschließlich Werte, die in der NFO ausdrücklich als IMDb gekennzeichnet sind. Bei „Ohne Bewertung“ ist die Quellenwahl deaktiviert. Diese Filter betreffen nur die Anzeige, niemals die Video- oder NFO-Dateien. **Bewertung absteigend** ist weiterhin eine Sortierung und unabhängig vom neuen Mindestwertfilter.
+
+## Kleine und versteckte Dateien / Bereinigung
+
+Standardmäßig werden **nur Videos ab 1.000.000 Byte (1 MB)** eingelesen. Versteckte Dateien und AppleDouble-Begleitdateien (z. B. `._Film.mpg`) werden unabhängig von ihrer Dateigröße ausgelassen. NFO-Dateien selbst sind davon nicht betroffen; sie werden weiterhin als Metadaten gelesen.
+
+Optional kannst du den Schwellenwert in `configuration.yaml` ändern:
+
+```yaml
+hoffmann_video_ha:
+  media_root: /media/Videorecorder/Backup/Video
+  min_video_bytes: 1000000
+```
+
+**„Filme neu einlesen“ ersetzt den bisherigen Katalog vollständig.** Nicht mehr vorhandene Videos, ausgeblendete Begleitdateien und zu kleine Dateien werden im zentralen Katalog entfernt. Eine **Löschung der Originaldateien** oder von NFO-Dateien findet dabei **niemals** statt. Falls ein Verzeichnis aufgrund eines Zugriffsfehlers nicht lesbar ist, wird der bestehende Katalog nicht durch einen unvollständigen Scan überschrieben. Prüfe nach einem Update den Status über der Filmliste.
 
 ## NFO-Dateien
 

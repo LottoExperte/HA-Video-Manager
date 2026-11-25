@@ -1,5 +1,5 @@
 /**
- * Hoffmann Video-Manager Home Assistant V1.0.1
+ * Hoffmann Video-Manager Home Assistant V1.0.3
  * No AI, no images, no user management, no external servers.
  * Uses authenticated Home Assistant WebSocket and a fresh media-source URL per play.
  */
@@ -101,13 +101,15 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
 @media(max-width:750px){table{min-width:0}main{padding:12px 9px 25px}h1{font-size:19px}th,td{padding:8px}.toolbar{gap:6px}.toolbar input{flex-basis:100%}.actions button{font-size:12px}.hide-sm{display:none}}
 </style>
 <main>
- <header><div><h1>Hoffmann Video-Manager</h1><div class="meta muted">Version 1.0.1 · Home Assistant · Filme aus „Meine Medien“ · NFO-Zusatzdateien</div></div>
+ <header><div><h1>Hoffmann Video-Manager</h1><div class="meta muted">Version 1.0.3 · Home Assistant · Filme aus „Meine Medien“ · NFO-Zusatzdateien</div></div>
  <button type="button" id="scan" class="button">↻ Filme neu einlesen</button></header>
  <div id="status" class="status muted" role="status">Katalog wird geladen …</div>
  <div class="toolbar">
   <input type="search" id="search" aria-label="Film suchen" placeholder="Film suchen (Titel, Jahr, Genre, Darsteller, Ordner) …" autocomplete="off">
   <select id="genre" aria-label="Genre"><option value="">Alle Genres</option></select>
   <select id="seen" aria-label="Gesehen"><option value="">Alle Filme</option><option value="unseen">Noch nicht gesehen</option><option value="seen">Schon gesehen</option><option value="favorites">Favoriten</option><option value="nfo">Mit NFO</option><option value="no-nfo">Ohne NFO</option></select>
+  <select id="rating" aria-label="Mindestbewertung" title="Filme nach Mindestbewertung filtern"><option value="">Alle Bewertungen</option><option value="rated">Mit Bewertung</option><option value="unrated">Ohne Bewertung</option><option value="5">Ab 5,0 Punkten</option><option value="6">Ab 6,0 Punkten</option><option value="6.5">Ab 6,5 Punkten</option><option value="7">Ab 7,0 Punkten</option><option value="7.5">Ab 7,5 Punkten</option><option value="8">Ab 8,0 Punkten</option><option value="8.5">Ab 8,5 Punkten</option><option value="9">Ab 9,0 Punkten</option><option value="9.5">Ab 9,5 Punkten</option></select>
+  <select id="ratingSource" aria-label="Bewertungsquelle" title="KI-Schätzungen von echten IMDb-Bewertungen unterscheiden"><option value="">Alle Bewertungsquellen</option><option value="imdb">Nur IMDb-Bewertungen</option><option value="no-ai">Ohne KI-Schätzungen</option></select>
   <select id="sort" aria-label="Sortieren"><option value="title">Titel A–Z</option><option value="year-desc">Jahr absteigend</option><option value="year-asc">Jahr aufsteigend</option><option value="folder">Ordner</option><option value="rating-desc">Bewertung absteigend</option></select>
  </div>
  <div class="formatbar" aria-label="Videoformate filtern">
@@ -127,6 +129,12 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
     this.$('search').addEventListener('input',()=>this._applyFilters());
     this.$('genre').addEventListener('change',()=>this._applyFilters());
     this.$('seen').addEventListener('change',()=>this._applyFilters());
+    this.$('rating').addEventListener('change',()=>{
+      // Source filtering cannot apply to movies without any rating.
+      this.$('ratingSource').disabled=this.$('rating').value==='unrated';
+      this._applyFilters();
+    });
+    this.$('ratingSource').addEventListener('change',()=>this._applyFilters());
     this.$('sort').addEventListener('change',()=>this._applyFilters());
     this.$('formatsAll').addEventListener('click',()=>{
       this._selectedFormats=new Set(HoffmannVideoHAPanel.FORMAT_GROUPS.map(g=>g.id));
@@ -151,7 +159,11 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
       const data=await this._hass.connection.sendMessagePromise({type:'hoffmann_video_ha/library',refresh:Boolean(refresh)});
       if(!Array.isArray(data.movies))throw Error('Die Serverantwort enthält keine Filmliste.');
       // Keep the table video-only even if an older cache or upstream API returns sidecars.
-      this._library=data.movies.filter(m=>HoffmannVideoHAPanel.VIDEO_EXTENSIONS.has(HoffmannVideoHAPanel.extensionOf(m)));
+      const minBytes=Number(data.min_video_bytes)||0;
+      this._library=data.movies.filter(m=>
+        HoffmannVideoHAPanel.VIDEO_EXTENSIONS.has(HoffmannVideoHAPanel.extensionOf(m))
+        && !String(m.filename||'').startsWith('.')
+        && (m.size_bytes == null || m.size_bytes >= minBytes));
       this._genres=[...new Set(this._library.flatMap(m=>Array.isArray(m.genres)?m.genres:[]))]
         .filter(Boolean).sort((a,b)=>a.localeCompare(b,'de'));
       const genre=this.$('genre');const previous=genre.value;
@@ -160,8 +172,12 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
       if(this._genres.includes(previous))genre.value=previous;
       this._renderFormatFilters();
       const when=data.scanned_at ? new Date(data.scanned_at).toLocaleString('de-DE') : 'unbekannt';
-      this._setStatus(`${this._library.length} Videos · Zusatzdaten für ${data.nfo_count} Filme · Katalog vom ${when}`);
-      if(data.errors?.length)this._setStatus(`${this._library.length} Videos · Zusatzdaten für ${data.nfo_count} Filme · Hinweise: ${data.errors.slice(0,2).join(' | ')}`);
+      const details=[];
+      if(data.skipped_small)details.push(`${data.skipped_small} unter 1 MB ausgeblendet`);
+      if(data.skipped_hidden)details.push(`${data.skipped_hidden} versteckte Begleitdateien ignoriert`);
+      if(data.removed_count)details.push(`${data.removed_count} alte Katalogeinträge entfernt`);
+      if(data.errors?.length)details.push(`Hinweise: ${data.errors.slice(0,2).join(' | ')}`);
+      this._setStatus(`${this._library.length} Videos · NFO: ${data.nfo_count} · Katalog vom ${when}${details.length ? ' · '+details.join(' · ') : ''}`);
       this._applyFilters();
     } catch(err) {
       this._setStatus(`Katalog konnte nicht geladen werden: ${err?.message||String(err)}. Medienpfad in configuration.yaml prüfen.`,true);
@@ -200,6 +216,7 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
   _applyFilters(){
     const q=this.$('search').value.trim().toLocaleLowerCase('de');
     const g=this.$('genre').value, seen=this.$('seen').value, sort=this.$('sort').value;
+    const ratingFilter=this.$('rating').value, ratingSourceFilter=this.$('ratingSource').value;
     this._filtered=this._library.filter(m=>{
       const formatId=HoffmannVideoHAPanel.groupForExtension(HoffmannVideoHAPanel.extensionOf(m));
       if(!formatId||!this._selectedFormats.has(formatId))return false;
@@ -210,6 +227,16 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
       if(seen==='favorites'&&!m.favorite)return false;
       if(seen==='nfo'&&!m.has_nfo)return false;
       if(seen==='no-nfo'&&m.has_nfo)return false;
+      const value=HoffmannVideoHAPanel.ratingValue(m);
+      if(ratingFilter==='rated'&&value===null)return false;
+      if(ratingFilter==='unrated')return value===null;
+      if(ratingFilter!==''&&ratingFilter!=='rated'&&value!==null&&value<Number(ratingFilter))return false;
+      if(ratingFilter!==''&&ratingFilter!=='rated'&&value===null)return false;
+      // A source filter is only relevant when a rating exists.
+      if(value!==null){
+        if(ratingSourceFilter==='imdb' && (m.rating_estimated||String(m.rating_source||'').trim().toLowerCase()!=='imdb'))return false;
+        if(ratingSourceFilter==='no-ai' && (m.rating_estimated||String(m.rating_source||'').toLowerCase().includes('schätzung')))return false;
+      } else if(ratingSourceFilter==='imdb')return false;
       return true;
     });
     const cmp=(a,b)=>String(a||'').localeCompare(String(b||''),'de',{numeric:true,sensitivity:'base'});
@@ -218,7 +245,7 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
         case 'year-desc':return (b.year||0)-(a.year||0)||cmp(a.title,b.title);
         case 'year-asc':return (a.year||9999)-(b.year||9999)||cmp(a.title,b.title);
         case 'folder':return cmp(a.folder,b.folder)||cmp(a.title,b.title);
-        case 'rating-desc':return (Number(b.rating)||0)-(Number(a.rating)||0)||cmp(a.title,b.title);
+        case 'rating-desc':return (HoffmannVideoHAPanel.ratingValue(b)||0)-(HoffmannVideoHAPanel.ratingValue(a)||0)||cmp(a.title,b.title);
         default:return cmp(a.title,b.title);
       }
     });
@@ -255,9 +282,14 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
     this.$('prev').disabled=this._page===0;
     this.$('next').disabled=this._page>=pages-1;
   }
+  static ratingValue(m){
+    if(m.rating===null||m.rating===undefined||m.rating==='')return null;
+    const v=Number(String(m.rating).replace(',','.'));
+    return Number.isFinite(v)&&v>0&&v<=10?v:null;
+  }
   _ratingLabel(m){
-    const v=Number(m.rating);
-    if(m.rating===null||m.rating===undefined||m.rating===''||!Number.isFinite(v)||v<=0||v>10)return '–';
+    const v=HoffmannVideoHAPanel.ratingValue(m);
+    if(v===null)return '–';
     const formatted=v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
     if(m.rating_estimated||String(m.rating_source||'').toLowerCase().includes('schätzung'))return `≈ ${formatted} (KI)`;
     return `${formatted} / 10`;
