@@ -1,0 +1,24 @@
+name: Quellcode pruefen
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python-Syntax
+        run: python -m py_compile custom_components/hoffmann_video_ha/__init__.py custom_components/hoffmann_video_ha/scanner.py
+      - name: NFO- und Scanner-Test
+        run: python tests/test_scanner.py
+      - name: JavaScript-Syntax
+        run: node --check custom_components/hoffmann_video_ha/frontend/panel.js
+      - name: Manifest-JSON
+        run: python -c "import json; from pathlib import Path; json.loads(Path('custom_components/hoffmann_video_ha/manifest.json').read_text())"
