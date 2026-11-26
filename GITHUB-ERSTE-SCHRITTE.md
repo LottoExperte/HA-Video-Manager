@@ -1,39 +1,31 @@
-# HA Video-Manager: GitHub-Update V1.0.4
+# HA Video-Manager – GitHub-Update V1.0.5
 
-Repository: https://github.com/LottoExperte/HA-Video-Manager
+Dieses Paket baut auf V1.0.4 auf und enthält weiterhin alle vorhandenen Funktionen, insbesondere NFO-Titel, IMDb-Bewertungen, Videoformate, Bereinigung und Zufallsfilm.
 
-Das Update baut auf **V1.0.3** auf und ergänzt:
+## Neu in V1.0.5
 
-- **Laufzeitfilter** (bis 45/60/75/**90**/120 Minuten, über 90 Minuten und unbekannte Laufzeit).
-- **Zufallsfilm** aus allen aktuell gefilterten Filmen, unabhängig von der sichtbaren Tabellenseite.
-- **Infodialog mit Wiedergabeknopf**, kein automatischer Filmstart.
-- Verbesserte Erkennung gängiger NFO-Laufzeitformate, keine Änderungen an Videos oder NFO-Dateien.
+Der Laufzeitfilter ist wie bei TVHeadend nach Bereichen gruppiert:
 
-## V1.0.4 veröffentlichen
+- 0–30 Minuten (einschließlich 30:00)
+- 30–60 Minuten (über 30:00 bis einschließlich 60:00)
+- 60–90 Minuten (über 60:00 bis einschließlich 90:00)
+- 90–180 Minuten (über 90:00 bis einschließlich 180:00)
+- Über 180 Minuten
+- Laufzeit unbekannt / Alle Laufzeiten
 
-1. Die ZIP-Datei `HA-Video-Manager-v1.0.4-Laufzeit-Zufallsfilm.zip` **entpacken** und ihren Inhalt in das bestehende lokale Repository kopieren:
+Die Auswahl ist mit Suche, Genre, Bewertung, Formaten und Zufallsfilm kombinierbar. Die NFO-Dateien werden nicht verändert. Ein erneutes Einlesen ist für diese reine Oberflächenänderung nicht erforderlich.
 
-   `C:\Users\Administrator\source\repos\HA-Video-Manager`
+## Veröffentlichen
 
-   Vorhandene Dateien überschreiben; den enthaltenen `custom_components`-Ordner **zusammenführen**.
-
-2. PowerShell dort öffnen und das GitHub-Skript starten:
+1. Den **Inhalt** von `HA-Video-Manager-v1.0.5-Laufzeitbereiche.zip` in das bereits bestehende lokale Repository kopieren, z. B. `C:\Users\Administrator\source\repos\HA-Video-Manager` (Dateien überschreiben).
+2. PowerShell im Repository öffnen:
 
    ```powershell
-   cd C:\Users\Administrator\source\repos\HA-Video-Manager
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\UPDATE-GITHUB-v1.0.4.ps1"
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\UPDATE-GITHUB-v1.0.5.ps1"
    ```
 
-   Das Skript überprüft Version, GitHub-Ziel und vorhandenes Tag und erstellt anschließend Commit und Tag in der richtigen Reihenfolge. Bei einem Fehler stoppt es; kein blindes erneutes Tagging.
+   Alternativ manuell in genau dieser Reihenfolge: `git add .`, `git commit -m "HA Video-Manager v1.0.5"`, `git push origin main`, `git tag v1.0.5`, `git push origin v1.0.5`.
+3. Auf https://github.com/LottoExperte/HA-Video-Manager/releases/new das **bereits gepushte Tag `v1.0.5` auswählen** und das Release veröffentlichen.
+4. In Home Assistant über den Marketplace aktualisieren. Home Assistant neu starten und die Seite nötigenfalls mit Strg+Umschalt+R neu laden.
 
-3. Auf https://github.com/LottoExperte/HA-Video-Manager/releases/new das Tag **`v1.0.4`** auswählen und das Release veröffentlichen (kein Pre-Release).
-4. Home Assistant über den Marketplace aktualisieren und **vollständig neu starten**. Falls nötig `Strg+Umschalt+R` im Browser.
-5. Im Video-Manager **„Filme neu einlesen“** wählen, wenn NFO-Dateien seit dem letzten Scan geändert wurden. Für den reinen Laufzeitfilter auf unverändertem Katalog ist kein Scan erforderlich.
-
-## Laufzeitfilter
-
-Im Auswahlfeld **„Alle Laufzeiten“** beispielsweise **„Bis 90 Minuten“** einstellen. Nur Filme mit bekannter NFO-Laufzeit (höchstens **90:00**) werden berücksichtigt. Filmdateien mit unbekannter Laufzeit werden bewusst ausgeschlossen. Um fehlende Laufzeiten zu finden, **„Laufzeit unbekannt“** auswählen.
-
-**„🎲 Zufallsfilm“** wählt einen Film aus genau der aktuellen Treffermenge. Der Film wird zunächst mit seinen Metadaten gezeigt und erst nach einem weiteren Klick auf **„▶ Abspielen“** gestartet. Für den Unterricht vorher Vorführrechte prüfen.
-
-Die vorhandene Konfiguration (`media_root`) und die NFO-Dateien bleiben unverändert.
+Das lokale Repository bleibt unter deiner Kontrolle. Die tatsächliche Home-Assistant-Installation kann hier nicht live getestet werden.

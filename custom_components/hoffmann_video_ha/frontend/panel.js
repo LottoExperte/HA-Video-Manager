@@ -1,5 +1,5 @@
 /**
- * Hoffmann Video-Manager Home Assistant V1.0.4
+ * Hoffmann Video-Manager Home Assistant V1.0.5
  * No AI, no images, no user management, no external servers.
  * Uses authenticated Home Assistant WebSocket and a fresh media-source URL per play.
  */
@@ -103,7 +103,7 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
 @media(max-width:750px){table{min-width:0}main{padding:12px 9px 25px}h1{font-size:19px}th,td{padding:8px}.toolbar{gap:6px}.toolbar input{flex-basis:100%}.actions button{font-size:12px}.hide-sm{display:none}}
 </style>
 <main>
- <header><div><h1>Hoffmann Video-Manager</h1><div class="meta muted">Version 1.0.4 · Home Assistant · Filme aus „Meine Medien“ · NFO-Zusatzdateien</div></div>
+ <header><div><h1>Hoffmann Video-Manager</h1><div class="meta muted">Version 1.0.5 · Home Assistant · Filme aus „Meine Medien“ · NFO-Zusatzdateien</div></div>
  <div class="header-actions"><button type="button" id="random" class="button" disabled title="Zufallsfilm aus den aktuellen Such- und Filterergebnissen auswählen">🎲 Zufallsfilm</button><button type="button" id="scan" class="button">↻ Filme neu einlesen</button></div></header>
  <div id="status" class="status muted" role="status">Katalog wird geladen …</div>
  <div class="toolbar">
@@ -112,7 +112,7 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
   <select id="seen" aria-label="Gesehen"><option value="">Alle Filme</option><option value="unseen">Noch nicht gesehen</option><option value="seen">Schon gesehen</option><option value="favorites">Favoriten</option><option value="nfo">Mit NFO</option><option value="no-nfo">Ohne NFO</option></select>
   <select id="rating" aria-label="Mindestbewertung" title="Filme nach Mindestbewertung filtern"><option value="">Alle Bewertungen</option><option value="rated">Mit Bewertung</option><option value="unrated">Ohne Bewertung</option><option value="5">Ab 5,0 Punkten</option><option value="6">Ab 6,0 Punkten</option><option value="6.5">Ab 6,5 Punkten</option><option value="7">Ab 7,0 Punkten</option><option value="7.5">Ab 7,5 Punkten</option><option value="8">Ab 8,0 Punkten</option><option value="8.5">Ab 8,5 Punkten</option><option value="9">Ab 9,0 Punkten</option><option value="9.5">Ab 9,5 Punkten</option></select>
   <select id="ratingSource" aria-label="Bewertungsquelle" title="KI-Schätzungen von echten IMDb-Bewertungen unterscheiden"><option value="">Alle Bewertungsquellen</option><option value="imdb">Nur IMDb-Bewertungen</option><option value="no-ai">Ohne KI-Schätzungen</option></select>
-  <select id="duration" aria-label="Maximale Laufzeit" title="Nur Filme mit bekannter Laufzeit anzeigen, wenn ein Minutenlimit gewählt ist"><option value="">Alle Laufzeiten</option><option value="45">Bis 45 Minuten</option><option value="60">Bis 60 Minuten</option><option value="75">Bis 75 Minuten</option><option value="90">Bis 90 Minuten</option><option value="120">Bis 120 Minuten</option><option value="over90">Über 90 Minuten</option><option value="unknown">Laufzeit unbekannt</option></select>
+  <select id="duration" aria-label="Laufzeitbereich" title="Filme nach Laufzeitbereichen filtern (bei 30, 60, 90 und 180 Minuten inklusive der kürzeren Gruppe)"><option value="">Alle Laufzeiten</option><option value="0-30">0–30 Minuten</option><option value="30-60">30–60 Minuten</option><option value="60-90">60–90 Minuten</option><option value="90-180">90–180 Minuten</option><option value="over180">Über 180 Minuten</option><option value="unknown">Laufzeit unbekannt</option></select>
   <select id="sort" aria-label="Sortieren"><option value="title">Titel A–Z</option><option value="year-desc">Jahr absteigend</option><option value="year-asc">Jahr aufsteigend</option><option value="folder">Ordner</option><option value="rating-desc">Bewertung absteigend</option><option value="duration-asc">Laufzeit aufsteigend</option></select>
  </div>
  <div class="formatbar" aria-label="Videoformate filtern">
@@ -301,9 +301,17 @@ video{display:block;width:min(1200px,96vw);max-height:calc(100vh - 130px);backgr
     const seconds=HoffmannVideoHAPanel.durationSeconds(movie);
     if(!filter)return true;
     if(filter==='unknown')return seconds===0;
-    if(filter==='over90')return seconds>90*60;
-    const minutes=Number(filter);
-    return Number.isFinite(minutes)&&minutes>0&&seconds>0&&seconds<=minutes*60;
+    if(seconds===0)return false; // Unbekannte Laufzeit nicht als Kurzfilm behandeln.
+    // Grenzwerte gehören zur jeweils kürzeren Gruppe: 30:00 => 0–30,
+    // 60:00 => 30–60, 90:00 => 60–90, 180:00 => 90–180.
+    switch(filter){
+      case '0-30':return seconds<=30*60;
+      case '30-60':return seconds>30*60&&seconds<=60*60;
+      case '60-90':return seconds>60*60&&seconds<=90*60;
+      case '90-180':return seconds>90*60&&seconds<=180*60;
+      case 'over180':return seconds>180*60;
+      default:return false;
+    }
   }
   _pickRandomFilm(){
     // _filtered covers ALL pages and respects genre, rating, formats, search, duration.

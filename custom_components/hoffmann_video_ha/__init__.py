@@ -1,4 +1,4 @@
-"""Hoffmann Video-Manager V1.0.4: fast read-only film index for HA media sources."""
+"""Hoffmann Video-Manager V1.0.5: fast read-only film index for HA media sources."""
 from __future__ import annotations
 
 import asyncio
@@ -129,7 +129,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         hass,
         webcomponent_name="hoffmann-video-ha-panel",
         frontend_url_path="hoffmann-video",
-        module_url="/hoffmann_video_ha/panel.js?v=1.0.4-laufzeit-zufall",
+        module_url="/hoffmann_video_ha/panel.js?v=1.0.5-laufzeit-intervalle",
         sidebar_title="Video-Manager",
         sidebar_icon="mdi:filmstrip",
         require_admin=False,
